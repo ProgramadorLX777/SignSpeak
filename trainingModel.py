@@ -1,7 +1,9 @@
 import os
 import csv
 import numpy as np
+import tkinter as tk
 from sklearn.neighbors import KNeighborsClassifier
+from tkinter import messagebox
 import joblib
 
 X = []
@@ -20,4 +22,6 @@ modelo = KNeighborsClassifier(n_neighbors=3)
 modelo.fit(X, y)
 
 joblib.dump(modelo, "modelo_senas.pkl")
-print("✅ Modelo entrenado guardado como 'modelo_senas.pkl'")
+root = tk.Tk()
+root.withdraw()  # Oculta la ventana principal
+messagebox.showinfo("Éxito", "Modelo entrenado y guardado correctamente!")

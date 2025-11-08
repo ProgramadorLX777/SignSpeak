@@ -13,7 +13,7 @@ def reconocer():
     subprocess.Popen(["python", "recognizeSignal.py"])
 
 root = tk.Tk()
-root.title("Sistema de Señas")
+root.title("Sistema de Senas")
 root.geometry("300x200")
 
 btn_grabar = tk.Button(root, text="Grabar Seña", command=grabar, width=20, height=2)

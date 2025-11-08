@@ -7,7 +7,7 @@ import time
 modelo = joblib.load("modelo_senas.pkl")
 
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.7)
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.7)
 mp_draw = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
@@ -83,10 +83,10 @@ while True:
         stabilized_time = 0
         prev_landmarks = None
 
-    cv2.putText(frame, f"Sign: {texto}", (10, 40),
+    cv2.putText(frame, f"Sena: {texto}", (10, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
 
-    cv2.imshow("Reconocimiento de señas", frame)
+    cv2.imshow("Reconocimiento", frame)
 
     if cv2.waitKey(1) & 0xFF == 27:  # ESC
         break

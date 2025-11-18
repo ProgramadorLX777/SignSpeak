@@ -1,0 +1,144 @@
+import cv2
+import mediapipe as mp
+import numpy as np
+import joblib
+import torch
+import torch.nn as nn
+import time
+
+# ------------------------
+# Cargar diccionario {id: label}
+# ------------------------
+id_to_label = joblib.load("models/labels.pkl")
+num_clases = len(id_to_label)
+
+# ------------------------
+# Modelo PyTorch (MISMA ARQUITECTURA DEL ENTRENAMIENTO)
+# ------------------------
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(84, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_clases)
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+modelo = MLP()
+modelo.load_state_dict(torch.load("models/modelo_pytorch.pth", map_location="cpu"))
+modelo.eval()
+
+# ------------------------
+# Función de predicción
+# ------------------------
+def predict_torch(model, datos):
+    tensor = torch.tensor(datos, dtype=torch.float32)
+    with torch.no_grad():
+        salida = model(tensor)
+        idx = torch.argmax(salida).item()
+    return idx
+
+# ------------------------
+# MediaPipe
+# ------------------------
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=1,
+    min_detection_confidence=0.7
+)
+mp_draw = mp.solutions.drawing_utils
+
+cap = cv2.VideoCapture(0)
+
+prev_landmarks = None
+stabilized_time = 0
+movement_threshold = 0.02
+threshold_stable = 1.0
+letra_final = ""
+
+print("📡 Reconociendo señas... (ESC para salir)")
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame = cv2.flip(frame, 1)
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = hands.process(rgb)
+
+    texto = "No detectado"
+
+    if results.multi_hand_landmarks:
+        datos = []
+        mano = results.multi_hand_landmarks[0]
+        current_landmarks = []
+
+        wrist_x = mano.landmark[0].x
+        wrist_y = mano.landmark[0].y
+
+        for lm in mano.landmark:
+            nx = lm.x - wrist_x
+            ny = lm.y - wrist_y
+            datos.extend([nx, ny])
+            current_landmarks.append((nx, ny))
+
+        while len(datos) < 84:
+            datos.append(0.0)
+
+        # ---- PREDICCIÓN ----
+        idx = predict_torch(modelo, datos)
+        prediccion = id_to_label[idx]
+
+        # ---- ESTABILIDAD I/J ----
+        if prediccion == "I":
+            if prev_landmarks:
+                diffs = [
+                    np.linalg.norm(np.array(c) - np.array(p))
+                    for c, p in zip(current_landmarks, prev_landmarks)
+                ]
+                movimiento = sum(diffs) / len(diffs)
+
+                if movimiento < movement_threshold:
+                    if stabilized_time == 0:
+                        stabilized_time = time.time()
+                    elif time.time() - stabilized_time >= threshold_stable:
+                        letra_final = "I"
+                else:
+                    if stabilized_time != 0 and time.time() - stabilized_time >= threshold_stable:
+                        letra_final = "J"
+                    stabilized_time = 0
+            prev_landmarks = current_landmarks
+
+        else:
+            letra_final = prediccion
+            stabilized_time = 0
+            prev_landmarks = None
+
+        texto = letra_final
+
+        mp_draw.draw_landmarks(frame, mano, mp_hands.HAND_CONNECTIONS)
+
+    else:
+        texto = "No detectado"
+        prev_landmarks = None
+        stabilized_time = 0
+
+    cv2.putText(frame, f"Sena: {texto}", (10, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 6)
+    cv2.putText(frame, f"Sena: {texto}", (10, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+
+    cv2.imshow("Reconocimiento PyTorch - Presione ESC para Salir", frame)
+
+    if cv2.waitKey(1) & 0xFF == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()

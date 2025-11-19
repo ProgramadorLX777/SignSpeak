@@ -25,7 +25,8 @@ if nombre_sena:
     print(f"Se grabará la seña: {nombre_sena}")
 else:
     messagebox.showerror("ERROR!!", "NO SE PUDO INGRESAR EL NOMBRE DE LA SEÑA!!")
-    
+    exit()
+        
 archivo = f"datos/{nombre_sena}.csv"
 num_frames = 100
 
@@ -35,6 +36,14 @@ grabando = False
 tiempo_mano_detectada = None   # Para contar los 5 segundos de detección estable
 ultimo_visto = time.time()     # Última vez que se vio la mano
 pausado = False                # indica si la grabación está pausada
+prev_filtered = None  # almacena landmarks suavizados
+alpha = 0.2           # factor de suavizado EMA (ajustable)
+
+def suavizar_landmarks(new_points, prev_points, alpha=0.2):
+    """Suaviza los landmarks usando Exponential Moving Average (EMA)."""
+    if prev_points is None:
+        return new_points
+    return (alpha * new_points) + ((1 - alpha) * prev_points)
 
 print(f"📸 Grabando la seña: '{nombre_sena}'...")
 
@@ -80,13 +89,15 @@ with open(archivo, mode='w', newline='') as f:
                 wrist_y = mano.landmark[0].y
 
                 for lm in mano.landmark:
-                    # SOLO x e y normalizados
+                    # AHORA GUARDAMOS x, y y z normalizados respecto a la muñeca
                     nx = lm.x - wrist_x
                     ny = lm.y - wrist_y
-                    datos.extend([nx, ny])
+                    nz = lm.z - mano.landmark[0].z   # ⬅ eje Z normalizado también
+                    datos.extend([nx, ny, nz])
 
-                # Rellenar hasta 84 valores
-                while len(datos) < 84:
+               # Rellenar hasta 84 valores
+               # Rellenar hasta 63*2 = 126 valores (si quieres mantener formato fijo)
+                while len(datos) < 126:
                     datos.append(0.0)
 
                 writer.writerow(datos)

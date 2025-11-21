@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import joblib
 import time
+from collections import deque
 
 SEQ_LEN = 20
 FEATURES = 63
@@ -38,7 +39,7 @@ mp_draw = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
 
-secuencia = []
+secuencia = deque(maxlen=20)   # ventana deslizante SEQ_LEN = 20
 
 print("🎥 Reconociendo señas dinámicas... ESC para salir")
 
@@ -61,7 +62,8 @@ while True:
         for lm in mano.landmark:
             datos.extend([lm.x, lm.y, lm.z])  # <--- las 63 features correctas
 
-        secuencia.append(datos)
+        
+        '''secuencia.append(datos)
 
         if len(secuencia) == SEQ_LEN:
             seq_tensor = torch.tensor([secuencia], dtype=torch.float32)
@@ -73,12 +75,28 @@ while True:
                 conf = conf.item()
                 idx = idx.item()
 
-            if conf >= 0.60:  # puedes ajustar el threshold
+            if conf >= 0.60:
                 ultimo_texto = f"{id_to_label[idx]} ({conf:.2f})"
             else:
                 ultimo_texto = "Confianza baja..."
 
-            secuencia = []  # reiniciar
+            secuencia = []  # reiniciar'''
+            
+        secuencia.append(datos)
+
+        if len(secuencia) == SEQ_LEN:
+            seq_tensor = torch.tensor([list(secuencia)], dtype=torch.float32)
+
+            with torch.no_grad():
+                out = modelo(seq_tensor)
+                prob = torch.softmax(out, dim=1)
+                conf, idx = torch.max(prob, dim=1)
+                conf = conf.item()
+                idx = idx.item()
+                
+
+            if conf >= 0.60:
+                ultimo_texto = f"{id_to_label[idx]} ({conf:.2f})"
 
 
     cv2.putText(frame, texto, (10, 40),

@@ -20,6 +20,22 @@ if not sign_name:
 
 mp_hands = mp.solutions.hands
 
+# ---------- NORMALIZAR SECUENCIA A LONGITUD FIJA ----------
+FIXED_LENGTH = 50
+
+def normalize_sequence(seq, target_len=FIXED_LENGTH):
+    seq = np.array(seq)
+
+    if len(seq) > target_len:
+        # Si hay demasiados → recortar equiespaciado
+        indices = np.linspace(0, len(seq) - 1, target_len).astype(int)
+        seq = seq[indices]
+    else:
+        # Si faltan → repetir últimos frames
+        while len(seq) < target_len:
+            seq = np.vstack([seq, seq[-1]])
+
+    return seq
 
 def record_dynamic_sign(sign_name, output_dir="data_dynamic", record_seconds=5):
     """
@@ -128,7 +144,7 @@ def record_dynamic_sign(sign_name, output_dir="data_dynamic", record_seconds=5):
         cv2.destroyAllWindows()
 
         # ---------- GUARDAR SECUENCIA COMPLETA ----------
-        sequence = np.array(sequence)
+        sequence = normalize_sequence(sequence)
 
         np.save(os.path.join(sign_path, f"{int(time.time())}.npy"), sequence)
 

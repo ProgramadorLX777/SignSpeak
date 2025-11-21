@@ -12,11 +12,14 @@ DATA_DIR = "data_dynamic"
 MODEL_PATH = "models/modelo_dinamico.pth"
 LABELS_PATH = "models/labels_dinamicos.pkl"
 
-SEQ_LEN = 20
+SEQ_LEN = 50
 FEATURES = 63
 BATCH_SIZE = 16
 EPOCHS = 50
 LR = 0.001
+
+# Crear carpeta models si no existe
+os.makedirs("models", exist_ok=True)
 
 # -------------------------
 # CARGA DE DATOS
@@ -30,41 +33,25 @@ joblib.dump(id_to_label, LABELS_PATH)
 
 for label in labels:
     carpeta = os.path.join(DATA_DIR, label)
+    archivos = sorted([f for f in os.listdir(carpeta) if f.endswith(".npy")])
 
-    frames = sorted([f for f in os.listdir(carpeta) if f.endswith(".npy")])
+    for f in archivos:
+        data = np.load(os.path.join(carpeta, f))  # (num_frames, 63)
 
-    if len(frames) == 0:
-        print(f"⚠ Señal '{label}' ignorada (no tiene frames).")
-        continue
-
-    seq = []
-
-    for f in frames:
-        data = np.load(os.path.join(carpeta, f))
-
-        # ------- ARREGLAR DIMENSIONES INCORRECTAS -------
-        data = np.array(data).reshape(-1)      # <— SIEMPRE queda (63,)
-        if data.shape[0] != FEATURES:
-            print(f"⚠ Frame ignorado por tamaño incorrecto: {f} en {label}")
+        if data.ndim != 2 or data.shape[1] != FEATURES:
+            print(f"⚠ Secuencia '{f}' ignorada (dimensiones incorrectas)")
             continue
 
-        seq.append(data)
+        seq = data
 
-    seq = np.array(seq)
+        if seq.shape[0] < SEQ_LEN:
+            padding = np.zeros((SEQ_LEN - seq.shape[0], FEATURES))
+            seq = np.vstack([seq, padding])
+        else:
+            seq = seq[:SEQ_LEN]
 
-    # ---------------- AJUSTAR LONGITUD A SEQ_LEN ----------------
-    if len(seq) == 0:
-        print(f"⚠ Señal '{label}' ignorada (frames inválidos).")
-        continue
-
-    if len(seq) < SEQ_LEN:
-        padding = np.zeros((SEQ_LEN - len(seq), FEATURES))
-        seq = np.vstack([seq, padding])
-    else:
-        seq = seq[:SEQ_LEN]
-
-    X.append(seq)
-    y.append(label_to_id[label])
+        X.append(seq)
+        y.append(label_to_id[label])
 
 # -------------------------
 # VALIDACIÓN FINAL
@@ -122,5 +109,8 @@ for epoch in range(EPOCHS):
 
     print(f"Epoch {epoch+1}/{EPOCHS} - Loss: {total_loss:.4f}")
 
+# -------------------------
+# GUARDAR MODELO
+# -------------------------
 torch.save(model.state_dict(), MODEL_PATH)
 print("\n✔ Modelo dinámico guardado:", MODEL_PATH)

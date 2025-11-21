@@ -6,20 +6,17 @@ import torch.nn as nn
 import joblib
 import time
 
-# -------------------------
-# CONFIG
-# -------------------------
 SEQ_LEN = 20
-FEATURES = 84
+FEATURES = 63
+
 MODEL_PATH = "models/modelo_dinamico.pth"
 LABELS_PATH = "models/labels_dinamicos.pkl"
+
+ultimo_texto = "Esperando secuencia..."
 
 id_to_label = joblib.load(LABELS_PATH)
 num_classes = len(id_to_label)
 
-# -------------------------
-# MODELO
-# -------------------------
 class ModeloLSTM(nn.Module):
     def __init__(self, input_size, hidden, num_classes):
         super().__init__()
@@ -35,9 +32,6 @@ modelo = ModeloLSTM(FEATURES, 128, num_classes)
 modelo.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
 modelo.eval()
 
-# -------------------------
-# MEDIAPIPE
-# -------------------------
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(max_num_hands=1)
 mp_draw = mp.solutions.drawing_utils
@@ -57,34 +51,35 @@ while True:
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(rgb)
 
-    texto = "Esperando secuencia..."
+    texto = ultimo_texto
 
     if results.multi_hand_landmarks:
         mano = results.multi_hand_landmarks[0]
         mp_draw.draw_landmarks(frame, mano, mp_hands.HAND_CONNECTIONS)
 
-        wrist_x = mano.landmark[0].x
-        wrist_y = mano.landmark[0].y
-
         datos = []
         for lm in mano.landmark:
-            datos.extend([lm.x - wrist_x, lm.y - wrist_y])
-
-        while len(datos) < FEATURES:
-            datos.append(0.0)
+            datos.extend([lm.x, lm.y, lm.z])  # <--- las 63 features correctas
 
         secuencia.append(datos)
 
-        # Cuando la secuencia llega a 20 frames → predecimos
         if len(secuencia) == SEQ_LEN:
             seq_tensor = torch.tensor([secuencia], dtype=torch.float32)
 
             with torch.no_grad():
                 out = modelo(seq_tensor)
-                idx = torch.argmax(out).item()
-                texto = id_to_label[idx]
+                prob = torch.softmax(out, dim=1)
+                conf, idx = torch.max(prob, dim=1)
+                conf = conf.item()
+                idx = idx.item()
 
-            secuencia = []   # reiniciar para nueva secuencia
+            if conf >= 0.60:  # puedes ajustar el threshold
+                ultimo_texto = f"{id_to_label[idx]} ({conf:.2f})"
+            else:
+                ultimo_texto = "Confianza baja..."
+
+            secuencia = []  # reiniciar
+
 
     cv2.putText(frame, texto, (10, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)

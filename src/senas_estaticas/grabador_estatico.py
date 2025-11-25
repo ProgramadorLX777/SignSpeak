@@ -19,7 +19,7 @@ mp_draw = mp.solutions.drawing_utils
 if not os.path.exists("datos"):
     os.makedirs("datos")
     
-nombre_sena = simpledialog.askstring("Seña para grabar: ", "Ingrese el nombre de la Seña: ")
+nombre_sena = simpledialog.askstring("Seña estática: ", "Ingrese el nombre de la seña estática: ")
 
 if nombre_sena:
     print(f"Se grabará la seña: {nombre_sena}")
@@ -28,7 +28,7 @@ else:
     exit()
         
 archivo = f"datos/{nombre_sena}.csv"
-num_frames = 300
+num_frames = 150
 
 cap = cv2.VideoCapture(0)
 contador = 0
@@ -83,7 +83,7 @@ with open(archivo, mode='w', newline='') as f:
                 else:
                     grabando = True
                     contador = 0
-                    print("Grabando Seña!!")
+                    print("Grabando Seña...")
 
             # --- SOLO GRABA SI grabando == True ---
             if grabando:
@@ -135,19 +135,19 @@ with open(archivo, mode='w', newline='') as f:
                 contador = 0  # Reinicia frames
                 cv2.putText(frame, "Grabación pausada por falta de mano", (10, 120),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                messagebox.showwarning("Pausa", "Se perdió la mano. Grabación pausada.")
+                messagebox.showwarning("Pausa", "Se perdió la mano!! Grabación pausada!!")
 
             # Si desaparece antes de grabar (durante la cuenta)
             if not grabando and tiempo_mano_detectada is not None:
                 tiempo_mano_detectada = None
 
         # Mostrar progreso
-        cv2.putText(frame, f"{nombre_sena} ({contador}/300)", (10, 40), 
+        cv2.putText(frame, f"{nombre_sena} ({contador}/150)", (10, 40), 
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 6)
-        cv2.putText(frame, f"{nombre_sena} ({contador}/300)", (10, 40), 
+        cv2.putText(frame, f"{nombre_sena} ({contador}/150)", (10, 40), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
 
-        cv2.imshow("Grabando frames - Presione ESC para Salir: ", frame)
+        cv2.imshow("Grabando - Presione ESC para Salir: ", frame)
         tecla = cv2.waitKey(1) & 0xFF
         if tecla == 27:  # ESC
             cancelado = True

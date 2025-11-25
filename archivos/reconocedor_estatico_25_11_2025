@@ -6,6 +6,13 @@ import torch
 import torch.nn as nn
 import time
 
+# ---------------------------
+# CONFIGURACIÓN DEL MODELO
+# ---------------------------
+INPUT_SIZE = 126
+HIDDEN1 = 128
+HIDDEN2 = 64
+
 # ------------------------
 # Cargar diccionario {id: label}
 # ------------------------
@@ -19,12 +26,13 @@ class MLP(nn.Module):
     def __init__(self):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(84, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_clases)
-        )
+        nn.Linear(126, 128),
+        nn.ReLU(),
+        nn.Linear(128, 64),
+        nn.ReLU(),
+        nn.Linear(64, num_clases)
+)
+
 
     def forward(self, x):
         return self.model(x)

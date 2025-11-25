@@ -1,0 +1,20 @@
+Tareas pendientes (KANBAN): (En progreso, Imcompleto, Finalizado)
+
+Módulo Señas estáticas: (Finalizado con Letras A-Z con derecha, 
+falta izquierda y numeros izquierda)
+
+- Grabador estático: (Finalizado) -> 126 frames por ejes X, Y, Z
+- Modelo entrenamiento estatico: (Finalizado) -> frames por ejes X, Y, Z
+- Reconocedor: (Finalizado) -> frames por ejes X, Y, Z
+
+Módulo Señas dinámico:
+
+- Grabador estático: (En progreso)
+- Modelo entrenamiento estatico: (En progreso)
+- Reconocedor: (En progreso)
+
+Módulo Señas bimanual:
+
+- Grabador estático: (En progreso)
+- Modelo entrenamiento estatico: (En progreso)
+- Reconocedor: (En progreso)

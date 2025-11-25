@@ -10,7 +10,7 @@ from tkinter import simpledialog, messagebox
 root = tk.Tk()
 root.withdraw()
 
-sign_name = simpledialog.askstring("Seña dinámica", "Ingrese el nombre de la seña a grabar:")
+sign_name = simpledialog.askstring("Seña dinámica", "Ingrese el nombre de la seña dinámica:")
 
 if not sign_name:
     messagebox.showerror("Error", "Debe ingresar un nombre para la seña.")

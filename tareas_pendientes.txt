@@ -7,11 +7,12 @@ falta izquierda y numeros izquierda)
 - Modelo entrenamiento estatico: (Finalizado) -> frames por ejes X, Y, Z
 - Reconocedor: (Finalizado) -> frames por ejes X, Y, Z
 
+28/11/2025
 Módulo Señas dinámico:
 
-- Grabador estático: (En progreso)
-- Modelo entrenamiento estatico: (En progreso)
-- Reconocedor: (En progreso)
+- Grabador estático: (Finalizado)
+- Modelo entrenamiento estatico: (Entrena)
+- Reconocedor: (En progreso - No reconoce ninguna seña entrenada)
 
 Módulo Señas bimanual:
 

@@ -39,7 +39,7 @@ for label in labels:
         data = np.load(os.path.join(carpeta, f))  # (num_frames, 63)
 
         if data.ndim != 2 or data.shape[1] != FEATURES:
-            print(f"⚠ Secuencia '{f}' ignorada (dimensiones incorrectas)")
+            print(f"Secuencia '{f}' ignorada (dimensiones incorrectas)")
             continue
 
         seq = data
@@ -57,7 +57,7 @@ for label in labels:
 # VALIDACIÓN FINAL
 # -------------------------
 if len(X) == 0:
-    raise Exception("❌ ERROR: Ninguna carpeta contiene secuencias válidas.")
+    raise Exception("ERROR!!: Ninguna carpeta contiene secuencias válidas!!")
 
 X = torch.tensor(np.array(X), dtype=torch.float32)
 y = torch.tensor(y, dtype=torch.long)
@@ -113,4 +113,4 @@ for epoch in range(EPOCHS):
 # GUARDAR MODELO
 # -------------------------
 torch.save(model.state_dict(), MODEL_PATH)
-print("\n✔ Modelo dinámico guardado:", MODEL_PATH)
+print("\nModelo dinámico guardado en:", MODEL_PATH)

@@ -47,7 +47,7 @@ window = deque(maxlen=SEQ_LEN)
 
 cap = cv2.VideoCapture(0)
 
-print("Reconociendo señas bimano…")
+print("Reconociendo señas bimanuales…")
 
 while True:
     ret, frame = cap.read()
@@ -103,7 +103,7 @@ while True:
         cv2.putText(flip, f"{pred_label} ({conf:.2f})", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
 
-    cv2.imshow("Reconocedor", flip)
+    cv2.imshow("Reconocedor bimanual - Presione ESC para Salir", flip)
 
     if cv2.waitKey(1) & 0xFF == 27:
         break

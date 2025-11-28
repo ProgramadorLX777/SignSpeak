@@ -94,14 +94,13 @@ while True:
                 conf = conf.item()
                 idx = idx.item()
                 
-
             if conf >= 0.60:
                 ultimo_texto = f"{id_to_label[idx]} ({conf:.2f})"
 
 
     cv2.putText(frame, texto, (10, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
-    cv2.imshow("Reconocimiento dinámico", frame)
+    cv2.imshow("Reconocimiento dinamico - Presione ESC para Salir!!", frame)
 
     if cv2.waitKey(1) == 27:
         break

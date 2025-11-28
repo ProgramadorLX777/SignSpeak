@@ -38,7 +38,7 @@ for label in labels:
         data = np.load(os.path.join(carpeta, f))
 
         if data.shape != (SEQ_LEN, FEATURES):
-            print(f"⚠ Se ignora {f}: dimensiones {data.shape} incorrectas")
+            print(f"Se ignora {f}: dimensiones {data.shape} incorrectas")
             continue
 
         X.append(data)
@@ -71,7 +71,7 @@ model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 criterion = nn.CrossEntropyLoss()
 
-print("Entrenando modelo bimano…")
+print("Entrenando modelo bimanual...")
 
 for epoch in range(EPOCHS):
     total_loss = 0

@@ -24,7 +24,7 @@ root.withdraw()
 label = simpledialog.askstring("Nueva seña dinámica (2 manos)", "Nombre de la seña:")
 
 if not label:
-    messagebox.showerror("Error", "Debes ingresar un nombre.")
+    messagebox.showerror("Error!!", "Debe ingresar un nombre.")
     exit()
 
 carpeta = os.path.join(DATA_DIR, label)
@@ -48,7 +48,7 @@ hands = mp_hands.Hands(
 cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
-    messagebox.showerror("Error", "No se pudo acceder a la cámara.")
+    messagebox.showerror("Error!!", "No se pudo acceder a la camara.")
     exit()
 
 print("\n▶ Aproxime sus manos para comenzar la grabación…")
@@ -101,7 +101,7 @@ while True:
 # -----------------------------
 # GRABACIÓN EXACTA DE 30 FRAMES
 # -----------------------------
-print("\n🎥 Grabando secuencia…\n")
+print("\nGrabando secuencia…\n")
 frames = []
 
 while len(frames) < SEQ_LEN:
@@ -158,4 +158,4 @@ messagebox.showinfo(
     f"Seña '{label}' guardada.\nFrames: {SEQ_LEN}\nRuta:\n{ruta_salida}"
 )
 
-print(f"✔ Secuencia guardada en: {ruta_salida}")
+print(f"Secuencia guardada en: {ruta_salida}")

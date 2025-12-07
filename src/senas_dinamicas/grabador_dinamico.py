@@ -1,159 +1,111 @@
-import cv2
-import mediapipe as mp
-import numpy as np
-import os
-import time
+# grabador_dinamico_fix.py
+import cv2, mediapipe as mp, numpy as np, os, time
 import tkinter as tk
 from tkinter import simpledialog, messagebox
 
-# ------------------ TKINTER CONFIG ------------------
-root = tk.Tk()
-root.withdraw()
-
+root = tk.Tk(); root.withdraw()
 sign_name = simpledialog.askstring("Seña dinámica", "Ingrese el nombre de la seña dinámica:")
-
 if not sign_name:
-    messagebox.showerror("Error", "Debe ingresar un nombre para la seña.")
-    raise SystemExit
-
-# -----------------------------------------------------
+    messagebox.showerror("Error", "Debe ingresar un nombre para la seña."); raise SystemExit
 
 mp_hands = mp.solutions.hands
 
-# ---------- NORMALIZAR SECUENCIA A LONGITUD FIJA ----------
-FIXED_LENGTH = 50
+# ---------- PARÁMETROS COMUNES ----------
+SEQ_LEN = 50            # debe coincidir con entrenador y reconocedor
+FEATURES = 63
+RECORD_SECONDS = 5
+EMA_ALPHA = 0.25        # suavizado (0 = sin suavizado)
+OUT_DIR = "data_dynamic"
+# ---------------------------------------
 
-def normalize_sequence(seq, target_len=FIXED_LENGTH):
+def normalize_frame(landmarks):
+    """Recibe lista de 21 landmarks (cada uno con x,y,z). Devuelve vector (63,) normalizado."""
+    pts = np.array([[lm[0], lm[1], lm[2]] for lm in landmarks])  # asegurar shape (21,3)
+    wrist = pts[0].copy()
+    pts = pts - wrist  # centrar
+    # escala referencia: distancia muñeca -> dedo medio (landmark 9 o 12)
+    ref = np.linalg.norm(pts[9])  # 9 es middle_finger_mcp (puedes probar 12 para tip)
+    if ref < 1e-6:
+        ref = 1.0
+    pts = pts / ref
+    return pts.flatten()
+
+def resample_sequence(seq, target_len=SEQ_LEN):
     seq = np.array(seq)
+    if len(seq) == 0:
+        return np.zeros((target_len, FEATURES))
+    if len(seq) >= target_len:
+        idx = np.linspace(0, len(seq)-1, target_len).astype(int)
+        return seq[idx]
+    # si faltan frames: repetir último
+    last = seq[-1]
+    pad = np.repeat(last[np.newaxis,:], target_len - len(seq), axis=0)
+    return np.vstack([seq, pad])
 
-    if len(seq) > target_len:
-        # Si hay demasiados → recortar equiespaciado
-        indices = np.linspace(0, len(seq) - 1, target_len).astype(int)
-        seq = seq[indices]
-    else:
-        # Si faltan → repetir últimos frames
-        while len(seq) < target_len:
-            seq = np.vstack([seq, seq[-1]])
-
-    return seq
-
-def record_dynamic_sign(sign_name, output_dir="data_dynamic", record_seconds=5):
-    """
-    Graba la seña dinámica como una única secuencia .npy
-    compatible con el modelo LSTM/BiLSTM.
-    """
-
-    # Crear carpetas
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    sign_path = os.path.join(output_dir, sign_name)
-    if not os.path.exists(sign_path):
-        os.makedirs(sign_path)
+def record_dynamic_sign(sign_name, output_dir=OUT_DIR, record_seconds=RECORD_SECONDS):
+    os.makedirs(output_dir, exist_ok=True)
+    sign_path = os.path.join(output_dir, sign_name); os.makedirs(sign_path, exist_ok=True)
 
     cap = cv2.VideoCapture(0)
+    prev_filtered = None
 
-    print(f"\n▶ Aproxime su mano para comenzar la grabación de: '{sign_name}'")
-    print("Esperando detección de mano...")
+    with mp_hands.Hands(static_image_mode=False, max_num_hands=1,
+                        min_detection_confidence=0.6, min_tracking_confidence=0.6) as hands:
 
-    with mp_hands.Hands(
-        static_image_mode=False,
-        max_num_hands=1,
-        min_detection_confidence=0.6,
-        min_tracking_confidence=0.6
-    ) as hands:
-
-        # ---------- ESPERAR MANO ----------
+        # esperar mano
         while True:
             ret, frame = cap.read()
             if not ret:
                 continue
-
-            frame = cv2.flip(frame, 1)
+            frame = cv2.flip(frame,1)
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = hands.process(rgb)
-
-            if results.multi_hand_landmarks:
-
-                # ---- CUENTA REGRESIVA ----
-                for i in range(3, 0, -1):
-                    ret2, frame2 = cap.read()
-                    frame2 = cv2.flip(frame2, 1)
-
-                    cv2.putText(frame2, f"Grabando en: {i}s",
-                                (50, 80), cv2.FONT_HERSHEY_SIMPLEX,
-                                1.5, (0, 255, 0), 3)
-
-                    cv2.imshow("Grabación de Seña Dinámica", frame2)
-                    cv2.waitKey(1000)
-
+            res = hands.process(rgb)
+            if res.multi_hand_landmarks:
+                # cuenta regresiva 5s para usar igual que tu flujo
+                for i in range(5,0,-1):
+                    ret2, f2 = cap.read()
+                    f2 = cv2.flip(f2,1)
+                    cv2.putText(f2, f"Grabando en: {i}s",(40,60),cv2.FONT_HERSHEY_SIMPLEX,1.4,(0,255,0),3)
+                    cv2.imshow("Grabando", f2); cv2.waitKey(1000)
                 break
-
-            cv2.putText(frame, "Acerque su mano para comenzar...",
-                        (20, 60), cv2.FONT_HERSHEY_SIMPLEX,
-                        1.2, (0, 0, 255), 3)
-
-            cv2.imshow("Grabación de Seña Dinámica", frame)
-
+            cv2.putText(frame, "Acerque su mano para comenzar...", (20,60), cv2.FONT_HERSHEY_SIMPLEX,1.2,(0,0,255),3)
+            cv2.imshow("Grabando", frame)
             if cv2.waitKey(1) & 0xFF == 27:
-                cap.release()
-                cv2.destroyAllWindows()
-                return
+                cap.release(); cv2.destroyAllWindows(); return
 
-        # ---------- GRABACIÓN ----------
-        print("\n🎥 Grabando movimiento...\n")
-        start_time = time.time()
-
-        sequence = []   # <--- secuencia completa para el modelo
-
-        while True:
+        # grabar durante X segundos
+        start = time.time()
+        seq = []
+        while time.time() - start < record_seconds:
             ret, frame = cap.read()
             if not ret:
                 break
-
-            frame = cv2.flip(frame, 1)
+            frame = cv2.flip(frame,1)
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = hands.process(rgb)
+            res = hands.process(rgb)
+            if res.multi_hand_landmarks:
+                hand = res.multi_hand_landmarks[0]
+                lm_list = [(lm.x, lm.y, lm.z) for lm in hand.landmark]
+                vec = normalize_frame(lm_list)        # 63 vector normalized
+                if prev_filtered is None or EMA_ALPHA <= 0:
+                    filtered = vec
+                else:
+                    filtered = EMA_ALPHA * vec + (1-EMA_ALPHA) * prev_filtered
+                prev_filtered = filtered
+                seq.append(filtered)
+                mp.solutions.drawing_utils.draw_landmarks(frame, hand, mp_hands.HAND_CONNECTIONS)
 
-            if results.multi_hand_landmarks:
-                hand = results.multi_hand_landmarks[0]
-
-                landmarks = []
-                for lm in hand.landmark:
-                    landmarks.extend([lm.x, lm.y, lm.z])
-
-                sequence.append(landmarks)
-
-                mp.solutions.drawing_utils.draw_landmarks(
-                    frame, hand, mp_hands.HAND_CONNECTIONS
-                )
-
-            cv2.putText(frame, "Grabando movimiento...",
-                        (20, 40), cv2.FONT_HERSHEY_SIMPLEX,
-                        1.2, (0, 255, 255), 3)
-
-            cv2.imshow("Grabación de Seña Dinámica", frame)
-
-            if time.time() - start_time >= record_seconds:
-                break
-
+            cv2.putText(frame, "Grabando movimiento...", (20,40), cv2.FONT_HERSHEY_SIMPLEX,1.0,(0,255,255),2)
+            cv2.imshow("Grabando", frame)
             if cv2.waitKey(1) & 0xFF == 27:
                 break
 
-        cap.release()
-        cv2.destroyAllWindows()
+        cap.release(); cv2.destroyAllWindows()
 
-        # ---------- GUARDAR SECUENCIA COMPLETA ----------
-        sequence = normalize_sequence(sequence)
+        seq = resample_sequence(seq, SEQ_LEN)   # asegurar len=SEQ_LEN
+        ts = int(time.time())
+        np.save(os.path.join(sign_path, f"{ts}.npy"), seq)
+        messagebox.showinfo("Grabación completa", f"Seña '{sign_name}' grabada. Frames: {seq.shape[0]}")
 
-        np.save(os.path.join(sign_path, f"{int(time.time())}.npy"), sequence)
-
-        print(f"✔ Seña dinámica '{sign_name}' grabada.")
-        print(f"✔ Frames en secuencia: {sequence.shape[0]}")
-
-        messagebox.showinfo("Grabación completa",
-                            f"Seña '{sign_name}' grabada.\n"
-                            f"Frames capturados: {sequence.shape[0]}")
-
-
-record_dynamic_sign(sign_name)
+if __name__ == "__main__":
+    record_dynamic_sign(sign_name)

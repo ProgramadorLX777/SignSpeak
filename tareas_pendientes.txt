@@ -10,9 +10,18 @@ falta izquierda y numeros izquierda)
 28/11/2025
 Módulo Señas dinámico:
 
-- Grabador estático: (Finalizado)
+- Grabador dinámico: (Finalizado)
+
+30/11/2025 -> FALTA CORREGIR ENTRENADOR Y RECONOCEDOR
 - Modelo entrenamiento estatico: (Entrena)
 - Reconocedor: (En progreso - No reconoce ninguna seña entrenada)
+
+07/12/2025
+Módulo Señas dinámico:
+
+- Grabador dinámico: (Finalizado con exito!!)
+- Modelo entrenamiento estatico: (Finalizo con exito!!)
+- Reconocedor: (Finalizado con exito!! Corregido con grabador auto de 5 frames para un total de 20 frames capturador, ahora si es eficiente!!)
 
 Módulo Señas bimanual:
 

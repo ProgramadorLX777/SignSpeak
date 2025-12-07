@@ -5,112 +5,155 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import joblib
 
-# -------------------------
-# CONFIG
-# -------------------------
-DATA_DIR = "data_dynamic"
-MODEL_PATH = "models/modelo_dinamico.pth"
+# ============================================================
+# CONFIGURACIÓN
+# ============================================================
+DATA_DIR = "data_dynamic"               # Carpeta donde el grabador guarda secuencias
+MODEL_PATH = "models/modelo_dinamico_transformer.pth"
 LABELS_PATH = "models/labels_dinamicos.pkl"
 
-SEQ_LEN = 50
-FEATURES = 63
+SEQ_LEN = 50                            # frames por secuencia
+FEATURES = 63                           # coordenadas mano + landmarks
 BATCH_SIZE = 16
-EPOCHS = 50
-LR = 0.001
+EPOCHS = 60
+LR = 0.0008
 
-# Crear carpeta models si no existe
 os.makedirs("models", exist_ok=True)
 
-# -------------------------
-# CARGA DE DATOS
-# -------------------------
-X, y = [], []
-labels = sorted([x for x in os.listdir(DATA_DIR) if os.path.isdir(os.path.join(DATA_DIR, x))])
+# ============================================================
+# CARGA DEL DATASET
+# ============================================================
+def cargar_dataset():
+    X, y = [], []
 
-label_to_id = {lbl: i for i, lbl in enumerate(labels)}
-id_to_label = {i: lbl for lbl, i in label_to_id.items()}
-joblib.dump(id_to_label, LABELS_PATH)
+    # Carpetas = etiquetas
+    labels = sorted([
+        x for x in os.listdir(DATA_DIR)
+        if os.path.isdir(os.path.join(DATA_DIR, x))
+    ])
 
-for label in labels:
-    carpeta = os.path.join(DATA_DIR, label)
-    archivos = sorted([f for f in os.listdir(carpeta) if f.endswith(".npy")])
+    if not labels:
+        raise Exception("❌ No hay carpetas dentro de data_dynamic")
 
-    for f in archivos:
-        data = np.load(os.path.join(carpeta, f))  # (num_frames, 63)
+    # Guardar mapeo ID → etiqueta
+    label_to_id = {lbl: i for i, lbl in enumerate(labels)}
+    id_to_label = {i: lbl for lbl, i in label_to_id.items()}
+    joblib.dump(id_to_label, LABELS_PATH)
 
-        if data.ndim != 2 or data.shape[1] != FEATURES:
-            print(f"Secuencia '{f}' ignorada (dimensiones incorrectas)")
-            continue
+    print("\n📌 ETIQUETAS DETECTADAS:")
+    for k, v in id_to_label.items():
+        print(f"  {k}: {v}")
 
-        seq = data
+    print("\n📂 Cargando secuencias...")
 
-        if seq.shape[0] < SEQ_LEN:
-            padding = np.zeros((SEQ_LEN - seq.shape[0], FEATURES))
-            seq = np.vstack([seq, padding])
-        else:
-            seq = seq[:SEQ_LEN]
+    # Leer secuencias .npy
+    for label in labels:
+        carpeta = os.path.join(DATA_DIR, label)
+        archivos = [f for f in os.listdir(carpeta) if f.endswith(".npy")]
 
-        X.append(seq)
-        y.append(label_to_id[label])
+        for archivo in archivos:
+            seq = np.load(os.path.join(carpeta, archivo))
 
-# -------------------------
-# VALIDACIÓN FINAL
-# -------------------------
-if len(X) == 0:
-    raise Exception("ERROR!!: Ninguna carpeta contiene secuencias válidas!!")
+            if seq.ndim != 2 or seq.shape[1] != FEATURES:
+                print(f"⚠ Ignorada secuencia {archivo} con shape {seq.shape}")
+                continue
 
-X = torch.tensor(np.array(X), dtype=torch.float32)
-y = torch.tensor(y, dtype=torch.long)
+            # Normalizar longitud
+            if seq.shape[0] < SEQ_LEN:
+                padding = np.repeat(seq[-1][None, :], SEQ_LEN - seq.shape[0], axis=0)
+                seq = np.vstack([seq, padding])
+            else:
+                seq = seq[:SEQ_LEN]
 
-dataset = TensorDataset(X, y)
-loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+            X.append(seq)
+            y.append(label_to_id[label])
 
-# -------------------------
-# MODELO LSTM
-# -------------------------
-class ModeloLSTM(nn.Module):
-    def __init__(self, input_size, hidden, num_classes):
+    if len(X) == 0:
+        raise Exception("❌ No hay secuencias válidas")
+
+    X = np.array(X, dtype=np.float32)
+    y = np.array(y, dtype=np.int64)
+
+    print(f"\n✔ Total secuencias cargadas: {len(X)}")
+    return X, y
+
+# ============================================================
+# MODELO TRANSFORMER
+# ============================================================
+class SignTransformer(nn.Module):
+    def __init__(self, features, num_classes, seq_len):
         super().__init__()
-        self.lstm = nn.LSTM(input_size, hidden, batch_first=True)
-        self.fc = nn.Linear(hidden, num_classes)
+        embed_dim = 128
+        num_heads = 8
+        hidden_dim = 256
+        num_layers = 3
+
+        self.embedding = nn.Linear(features, embed_dim)
+        self.pos_encoding = nn.Parameter(torch.randn(1, seq_len, embed_dim))
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=hidden_dim,
+            dropout=0.1,
+            batch_first=True
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+
+        self.cls = nn.Linear(embed_dim, num_classes)
 
     def forward(self, x):
-        out, _ = self.lstm(x)
-        out = out[:, -1, :]
-        return self.fc(out)
+        x = self.embedding(x) + self.pos_encoding
+        encoded = self.encoder(x)
+        pooled = encoded[:, -1, :]
+        out = self.cls(pooled)
+        return out
 
-model = ModeloLSTM(FEATURES, 128, len(labels))
+# ============================================================
+# ENTRENAMIENTO
+# ============================================================
+def entrenar():
+    # Cargar dataset
+    X, y = cargar_dataset()
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
+    dataset = TensorDataset(torch.tensor(X), torch.tensor(y))
+    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-# -------------------------
-# TRAINING
-# -------------------------
-optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-criterion = nn.CrossEntropyLoss()
+    num_classes = len(np.unique(y))
 
-print("Entrenando modelo dinámico en:", device)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"\n⚡ Entrenando en: {device}")
 
-for epoch in range(EPOCHS):
-    total_loss = 0
+    model = SignTransformer(FEATURES, num_classes, SEQ_LEN).to(device)
+    crit = nn.CrossEntropyLoss()
+    opt = torch.optim.Adam(model.parameters(), lr=LR)
 
-    for batch_x, batch_y in loader:
-        batch_x = batch_x.to(device)
-        batch_y = batch_y.to(device)
+    # Bucle de entrenamiento
+    for epoch in range(EPOCHS):
+        total_loss = 0
 
-        optimizer.zero_grad()
-        out = model(batch_x)
-        loss = criterion(out, batch_y)
-        loss.backward()
-        optimizer.step()
+        for batch_x, batch_y in loader:
+            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-        total_loss += loss.item()
+            opt.zero_grad()
+            pred = model(batch_x)
+            loss = crit(pred, batch_y)
 
-    print(f"Epoch {epoch+1}/{EPOCHS} - Loss: {total_loss:.4f}")
+            loss.backward()
+            opt.step()
 
-# -------------------------
-# GUARDAR MODELO
-# -------------------------
-torch.save(model.state_dict(), MODEL_PATH)
-print("\nModelo dinámico guardado en:", MODEL_PATH)
+            total_loss += loss.item()
+
+        print(f"📘 Epoch {epoch+1}/{EPOCHS}  |  Loss: {total_loss/len(loader):.4f}")
+
+    # Guardar modelo
+    torch.save(model.state_dict(), MODEL_PATH)
+    print("\n✔ Modelo guardado en:", MODEL_PATH)
+    print("✔ Etiquetas guardadas en:", LABELS_PATH)
+
+
+# ============================================================
+# MAIN
+# ============================================================
+if __name__ == "__main__":
+    entrenar()

@@ -23,8 +23,9 @@ Módulo Señas dinámico:
 - Modelo entrenamiento estatico: (Finalizo con exito!!)
 - Reconocedor: (Finalizado con exito!! Corregido con grabador auto de 5 frames para un total de 20 frames capturador, ahora si es eficiente!!)
 
+09/12/2025
 Módulo Señas bimanual:
 
 - Grabador estático: (En progreso)
 - Modelo entrenamiento estatico: (En progreso)
-- Reconocedor: (En progreso)
+- Reconocedor: (RECONOCE PERO NO ES TAN PRECISO, FALTA MEJORAR PRECISION)

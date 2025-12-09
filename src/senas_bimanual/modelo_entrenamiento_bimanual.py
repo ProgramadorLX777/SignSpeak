@@ -9,14 +9,14 @@ import joblib
 # CONFIG
 # -------------------------
 DATA_DIR = "data_dynamic_bimano"
-MODEL_PATH = "models/modelo_bimano.pth"
+MODEL_PATH = "models/modelo_dinamico_bimanual.pth"
 LABELS_PATH = "models/labels_bimano.pkl"
 
 SEQ_LEN = 50
 FEATURES = 126
 BATCH_SIZE = 16
 EPOCHS = 50
-LR = 0.001
+LR = 0.0008
 
 os.makedirs("models", exist_ok=True)
 
@@ -51,27 +51,39 @@ dataset = TensorDataset(X, y)
 loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 # -------------------------
-# MODELO
+# MODELO TRANSFORMER
 # -------------------------
-class LSTMBimano(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
+class TransformerBimano(nn.Module):
+    def __init__(self, input_dim, num_classes, dim=256, heads=8, layers=4):
         super().__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_classes)
+
+        self.input_fc = nn.Linear(input_dim, dim)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=dim,
+            nhead=heads,
+            dim_feedforward=512,
+            dropout=0.1,
+            batch_first=True
+        )
+
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=layers)
+        self.fc = nn.Linear(dim, num_classes)
 
     def forward(self, x):
-        out, _ = self.lstm(x)
-        out = out[:, -1, :]
-        return self.fc(out)
+        x = self.input_fc(x)
+        out = self.transformer(x)
+        last = out[:, -1, :]
+        return self.fc(last)
 
-model = LSTMBimano(FEATURES, 128, len(labels))
+model = TransformerBimano(FEATURES, len(labels))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 criterion = nn.CrossEntropyLoss()
 
-print("Entrenando modelo bimanual...")
+print("Entrenando modelo Transformer bimanual...")
 
 for epoch in range(EPOCHS):
     total_loss = 0

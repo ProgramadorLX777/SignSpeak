@@ -30,12 +30,11 @@ if not label:
 carpeta = os.path.join(DATA_DIR, label)
 os.makedirs(carpeta, exist_ok=True)
 
-# Nombre secuencial
 contador = len(os.listdir(carpeta)) + 1
 ruta_salida = os.path.join(carpeta, f"{contador}.npy")
 
 # -----------------------------
-# INICIALIZAR MEDIAPIPE Y CAMARA
+# MEDIAPIPE Y CAMARA
 # -----------------------------
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(
@@ -54,12 +53,12 @@ if not cap.isOpened():
 print("\n▶ Aproxime sus manos para comenzar la grabación…")
 time.sleep(0.5)
 
-# DESCARTAR FRAMES INICIALES
+# DESCARTAR FRAMES
 for _ in range(5):
     cap.read()
 
 # -----------------------------
-# ESPERAR DETECCIÓN DE MANO
+# ESPERAR DETECCIÓN
 # -----------------------------
 while True:
     ret, frame = cap.read()
@@ -71,26 +70,19 @@ while True:
     result = hands.process(rgb)
 
     if result.multi_hand_landmarks:
-        # -----------------------
-        # CUENTA REGRESIVA
-        # -----------------------
         for i in range(3, 0, -1):
             ret2, frame2 = cap.read()
             frame2 = cv2.flip(frame2, 1)
-
             cv2.putText(frame2, f"Grabando en: {i}",
                         (50, 80), cv2.FONT_HERSHEY_SIMPLEX,
                         2, (0, 255, 0), 4)
-
             cv2.imshow("Grabación 2 manos", frame2)
             cv2.waitKey(1000)
-
         break
 
     cv2.putText(frame, "Acerque sus manos...",
                 (50, 80), cv2.FONT_HERSHEY_SIMPLEX,
                 1.5, (0, 0, 255), 3)
-
     cv2.imshow("Grabación 2 manos", frame)
 
     if cv2.waitKey(1) & 0xFF == 27:
@@ -99,7 +91,7 @@ while True:
         exit()
 
 # -----------------------------
-# GRABACIÓN EXACTA DE 30 FRAMES
+# GRABACIÓN EXACTA DE 50 FRAMES
 # -----------------------------
 print("\nGrabando secuencia…\n")
 frames = []
@@ -113,7 +105,6 @@ while len(frames) < SEQ_LEN:
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     result = hands.process(rgb)
 
-    # manos por defecto (si falta una)
     mano1 = np.zeros((21, 3))
     mano2 = np.zeros((21, 3))
 
@@ -128,7 +119,6 @@ while len(frames) < SEQ_LEN:
             elif i == 1:
                 mano2 = np.array(pts)
 
-    # vector de 126 features
     vec = np.concatenate([mano1.flatten(), mano2.flatten()])
     frames.append(vec)
 
@@ -147,8 +137,7 @@ cv2.destroyAllWindows()
 frames = np.array(frames)
 
 if frames.shape != (SEQ_LEN, FEATURES):
-    messagebox.showerror("Error",
-        f"Dimensiones incorrectas: {frames.shape}. No guardado.")
+    messagebox.showerror("Error", f"Dimensiones incorrectas: {frames.shape}. No guardado.")
     exit()
 
 np.save(ruta_salida, frames)
